@@ -2,6 +2,8 @@ import os
 import cv2
 from PIL import Image, ImageEnhance
 import pytesseract
+import pyautogui
+import subprocess
 import re
 import time
 
@@ -45,11 +47,29 @@ def check_for_claim(text):
         return True
     return False
 
+def restart_app():
+    print("Restarting the app...")
+    os.system("adb shell input keyevent KEYCODE_APP_SWITCH")
+    time.sleep(1)
+    os.system("adb shell input swipe 500 1000 300 10")
+    time.sleep(1)
+    os.system("adb shell input swipe 500 1000 300 10")
+    time.sleep(1)
+    os.system("adb shell input keyevent 4")
+    time.sleep(2)
+    time.sleep(9)
+    os.system("adb shell input tap 757 1130")
+    os.system("adb shell input tap 757 1799")
+    #time.sleep(2)
+    #os.system("adb shell input tap 295 2150")
+    print("App restarted and inputs executed.")
+
 # Function to determine the question and options and execute ADB command
 def process_and_click(numbers):
     if len(numbers) < 4:
         print(numbers)
         print("Not enough numbers extracted to form a question and options.")
+        restart_app()
         return
 
     # Form the question by joining all numbers except the last 4
@@ -103,6 +123,7 @@ def process_and_click(numbers):
 # Main process
 def main():
     # Paths
+    clicks=0
     original_image = "screen.png"
     cropped_image = "cropped_image.png"
     cleaned_image = "cleaned_image.png"
@@ -123,16 +144,21 @@ def main():
 
         # Step 4: Check if "Claim" is in the extracted text
         if check_for_claim(text):
+            clicks+=1
             adb_command = "adb shell input tap 757 1950"
             os.system(adb_command)
-            print("Found 'Claim' in the text. Executed tap command at coordinates 757 1950.")
-            break  # Exit the loop after clicking on "Claim"
+            print(f"Tapped Claim:{clicks}")
+            time.sleep(33)
+            back_button = "adb shell input keyevent 4"
+            os.system(back_button)
+              # Exit the loop after clicking on "Claim"
 
         # Step 5: Process numbers and execute tap command for question options
         process_and_click(numbers)
 
         # Sleep before taking the next screenshot (you can adjust the sleep time as needed)
-        time.sleep(3)
+        time.sleep(1)
 
 if __name__ == "__main__":
     main()
+
