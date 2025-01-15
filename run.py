@@ -38,7 +38,6 @@ def extract_numbers(image_path):
     preprocessed_image = preprocess_image(image_path)
     text = pytesseract.image_to_string(preprocessed_image, config="--psm 6")
     numbers = re.findall(r'\d+', text)
-    print(numbers)
     return numbers, text  # Return both numbers and the full text
 
 # Function to check if the text contains "Claim"
@@ -48,7 +47,6 @@ def check_for_claim(text):
     return False
 
 def restart_app():
-    print("Restarting the app...")
     os.system("adb shell input keyevent KEYCODE_APP_SWITCH")
     time.sleep(1)
     os.system("adb shell input swipe 500 1000 300 10")
@@ -62,14 +60,10 @@ def restart_app():
     os.system("adb shell input tap 757 1799")
     #time.sleep(2)
     #os.system("adb shell input tap 295 2150")
-    print("App restarted and inputs executed.")
 
 # Function to determine the question and options and execute ADB command
 def process_and_click(numbers):
     if len(numbers) < 4:
-        print(numbers)
-        print("Not enough numbers extracted to form a question and options.")
-        restart_app()
         return
 
     # Form the question by joining all numbers except the last 4
@@ -96,9 +90,6 @@ def process_and_click(numbers):
             coords = coordinates[i]
             adb_command = f"adb shell input tap {coords}"
             os.system(adb_command)
-            print(f"Question: {question}")
-            print(f"Options: {options}")
-            print(f"Exact match found with option at index {i}. Executed command: {adb_command}")
             return
 
     # If no exact match, proceed to check for 3 or 2 digit match
@@ -111,12 +102,8 @@ def process_and_click(numbers):
             coords = coordinates[i]
             adb_command = f"adb shell input tap {coords}"
             os.system(adb_command)
-            print(f"Question: {question}")
-            print(f"Options: {options}")
-            print(f"Correct option found at index {i}. Executed command: {adb_command}")
             return
 
-    print("No suitable match found for the question in options.")
     adb_command = "adb shell input tap 757 1630"
     os.system(adb_command)
 
@@ -131,7 +118,6 @@ def main():
     while True:
         # Capture a screenshot and save it
         os.system(f"adb exec-out screencap -p > {original_image}")
-        print("Screenshot saved as 'screen.png'")
 
         # Step 1: Crop the top 20% of the image
         cropped_image = crop_image(original_image, cropped_image)
@@ -148,9 +134,7 @@ def main():
             adb_command = "adb shell input tap 757 1950"
             os.system(adb_command)
             print(f"Tapped Claim:{clicks}")
-            time.sleep(33)
-            back_button = "adb shell input keyevent 4"
-            os.system(back_button)
+            time.sleep(60)
               # Exit the loop after clicking on "Claim"
 
         # Step 5: Process numbers and execute tap command for question options
