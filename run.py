@@ -1,7 +1,9 @@
 import os
-import cv2
+import subprocess
+import cv2 
 from PIL import Image, ImageEnhance
 import pytesseract
+import xml.etree.ElementTree as ET
 import re
 import time
 
@@ -21,6 +23,41 @@ def clean_image(image_path, output_path):
     denoised_image = cv2.medianBlur(binary_image, 3)
     cv2.imwrite(output_path, denoised_image)
     return output_path
+
+#Close Special Ad's
+def find_and_tap_button_by_description(description):
+    """
+    Finds a button by its content description and taps on it.
+
+    :param description: The content description of the button to tap.
+    """
+    # Generate the UI dump and pull the XML file
+    subprocess.run(["adb", "shell", "uiautomator", "dump"], check=True)
+    subprocess.run(["adb", "pull", "/sdcard/window_dump.xml"], check=True)
+
+    # Parse the XML file
+    tree = ET.parse("window_dump.xml")
+    root = tree.getroot()
+
+    # Loop through the XML to find the button with the matching content-desc
+    for node in root.iter("node"):
+        content_desc = node.attrib.get("content-desc")
+        if content_desc and description in content_desc:
+            bounds = node.attrib.get("bounds")
+            if bounds:
+                # Parse the bounds to extract the coordinates
+                bounds = bounds.strip("[]").split("][")
+                left_top = list(map(int, bounds[0].split(",")))
+                right_bottom = list(map(int, bounds[1].split(",")))
+
+                # Calculate the center coordinates
+                x = (left_top[0] + right_bottom[0]) // 2
+                y = (left_top[1] + right_bottom[1]) // 2
+
+                # Tap on the calculated coordinates
+                subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
+                print(f"Tapped on the button with content-desc: '{description}' at coordinates: ({x}, {y})")
+                return True
 
 # Function to preprocess the image for OCR
 def preprocess_image(image_path):
@@ -75,12 +112,26 @@ def is_navigation_bar_present():
 # Function to handle skip or close and close alert with "Continue"
 def handle_skip_or_close():
     os.system("adb shell uiautomator dump /sdcard/window_dump.xml")
+    os.system("adb shell uiautomator dump /sdcard/window_dump.xml > result.txt")
+    with open("result.txt",'r') as log:
+        status = log.readline()
+        print(status)
+        if(status.find("status.findUI hierchary dumped to: /sdcard/window_dump.xml")):
+            print("Success")
+            find_and_tap_button_by_description("Close Ad")
+            return True
+        else:
+            print("Failed")
+            find_and_tap_button_by_description("Close Ad") 
+            return True
+
     os.system("adb pull /sdcard/window_dump.xml window_dump.xml")
     with open("window_dump.xml", "r", encoding="utf-8") as file:
         content = file.read()
 
     # Check for the presence of a "close" button or "skip" button
     close_bounds = find_bounds_by_keyword(content, "close")
+    close_ad = find_bounds_by_keyword(content, "Close Ad")
     skip_bounds = find_bounds_by_keyword(content, "skip")
 
     # If "close" is found, tap on "close"
@@ -89,6 +140,13 @@ def handle_skip_or_close():
         os.system(f"adb shell input tap {x} {y}")
         print(f"Tapped on button with resource-id containing 'close' at ({x}, {y})")
         return True
+    
+    elif close_ad:
+        x, y = close_ad
+        os.system(f"adb shell input tap {x} {y}")
+        print(f"Tapped on button with resource-id containing 'close ad' at ({x}, {y})")
+        return True
+    
     elif skip_bounds:
         x, y = skip_bounds
         os.system(f"adb shell input tap {x} {y}")
@@ -158,7 +216,6 @@ def main():
             while not handle_skip_or_close():
                 pass  # Keep checking until a skip or close button is found and handled
 
-            os.system("adb shell input keyevent 4")  # Press back button
             continue
 
         # Step 6: Process question and options
