@@ -42,7 +42,25 @@ def find_and_tap_button_by_description(description):
     # Loop through the XML to find the button with the matching content-desc
     for node in root.iter("node"):
         content_desc = node.attrib.get("content-desc")
+        resource_desc = node.attrib.get("resource-id")
         if content_desc and description in content_desc:
+            bounds = node.attrib.get("bounds")
+            if bounds:
+                # Parse the bounds to extract the coordinates
+                bounds = bounds.strip("[]").split("][")
+                left_top = list(map(int, bounds[0].split(",")))
+                right_bottom = list(map(int, bounds[1].split(",")))
+
+                # Calculate the center coordinates
+                x = (left_top[0] + right_bottom[0]) // 2
+                y = (left_top[1] + right_bottom[1]) // 2
+
+                # Tap on the calculated coordinates
+                subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
+                print(f"Tapped on the button with content-desc: '{description}' at coordinates: ({x}, {y})")
+                return True
+            
+        if resource_desc and description in resource_desc:
             bounds = node.attrib.get("bounds")
             if bounds:
                 # Parse the bounds to extract the coordinates
@@ -89,17 +107,28 @@ def find_bounds_by_keyword(xml_content, keyword):
         return x_center, y_center
     return None
 
+def checkBackButton(xml_content, keyword):
+    match = re.search(rf'<node.*?content-desc="[^"]*{keyword}[^"]*".*?bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml_content)
+    if match:
+        x_center = (int(match.group(1)) + int(match.group(3))) // 2
+        y_center = (int(match.group(2)) + int(match.group(4))) // 2
+        return x_center, y_center
+    return None
+
 # Function to check for navigation bar presence
 def is_navigation_bar_present():
     os.system("adb shell uiautomator dump /sdcard/window_dump.xml > result.txt")
     with open("result.txt",'r') as log:
         status = log.readline()
         print(status)
-        if(status.find("status.findUI hierchary dumped to: /sdcard/window_dump.xml")):
-            print("Success")
-        else:
+        if(status.find("")):
+            print("Failed from skip/close")
             os.system("adb shell input tap 1002 100")
             os.system("adb shell input tap 1002 120")
+            return True
+        else:
+            print("Success")
+
 
     os.system("adb pull /sdcard/window_dump.xml window_dump.xml")
     with open("window_dump.xml", "r", encoding="utf-8") as file:
@@ -116,14 +145,13 @@ def handle_skip_or_close():
     with open("result.txt",'r') as log:
         status = log.readline()
         print(status)
-        if(status.find("status.findUI hierchary dumped to: /sdcard/window_dump.xml")):
-            print("Success")
-            find_and_tap_button_by_description("Close Ad")
+        if(status.find("")):
+            print("Failed from skip/close")
+            os.system("adb shell input tap 1002 100")
+            os.system("adb shell input tap 1002 120")
             return True
         else:
-            print("Failed")
-            find_and_tap_button_by_description("Close Ad") 
-            return True
+            print("Success")
 
     os.system("adb pull /sdcard/window_dump.xml window_dump.xml")
     with open("window_dump.xml", "r", encoding="utf-8") as file:
@@ -132,6 +160,7 @@ def handle_skip_or_close():
     # Check for the presence of a "close" button or "skip" button
     close_bounds = find_bounds_by_keyword(content, "close")
     close_ad = find_bounds_by_keyword(content, "Close Ad")
+    close_ad_desc = find_and_tap_button_by_description("Close Ad")
     skip_bounds = find_bounds_by_keyword(content, "skip")
 
     # If "close" is found, tap on "close"
@@ -143,6 +172,12 @@ def handle_skip_or_close():
     
     elif close_ad:
         x, y = close_ad
+        os.system(f"adb shell input tap {x} {y}")
+        print(f"Tapped on button with resource-id containing 'close ad' at ({x}, {y})")
+        return True
+    
+    elif close_ad_desc:
+        x, y = close_ad_desc
         os.system(f"adb shell input tap {x} {y}")
         print(f"Tapped on button with resource-id containing 'close ad' at ({x}, {y})")
         return True
@@ -177,14 +212,26 @@ def handle_alert_continue():
         return True
     return False
 
+def navibar():
+    os.system("adb pull /sdcard/window_dump.xml window_dump.xml")
+    with open("window_dump.xml", "r", encoding="utf-8") as file:
+        content = file.read()
+    # Check if "android:id/navigationBarBackground" is in the content
+        backkey = checkBackButton(content, "Back")
+        if backkey != None:
+            return True
+        else:
+            return False
+
 # Main process
 def main():
     original_image = "screen.png"
     cropped_image = "cropped_image.png"
     cleaned_image = "cleaned_image.png"
     clicks = 0
-
     while True:
+        RunAPP = navibar()
+        print(RunAPP)
         # Step 1: Check for navigation bar presence
         if not is_navigation_bar_present():
             print("Navigation bar not found. Checking for skip or close buttons...")
@@ -192,52 +239,56 @@ def main():
                 pass  # Keep checking until a skip or close button is found and handled
             continue
 
+        if RunAPP:
         # Step 2: Capture a screenshot and save it
-        os.system(f"adb exec-out screencap -p > {original_image}")
-        print("Screenshot saved as 'screen.png'")
+            os.system(f"adb exec-out screencap -p > {original_image}")
+            print("Screenshot saved as 'screen.png'")
 
-        # Step 3: Crop and clean the image
-        cropped_image = crop_image(original_image, cropped_image)
-        cleaned_image = clean_image(cropped_image, cleaned_image)
+            # Step 3: Crop and clean the image
+            cropped_image = crop_image(original_image, cropped_image)
+            cleaned_image = clean_image(cropped_image, cleaned_image)
 
-        # Step 4: Extract numbers and text
-        numbers, text = extract_numbers(cleaned_image)
+            # Step 4: Extract numbers and text
+            numbers, text = extract_numbers(cleaned_image)
+            print(f"Numbers:{numbers},Text: {text}")
 
-        # Step 5: Check for "Claim" in the text
-        if check_for_claim(text):
-            clicks += 1
-            os.system("adb shell input tap 757 1950")
-            print(f"Tapped 'Claim': {clicks}")
-            if clicks > 25:
-                return
+            # Step 5: Check for "Claim" in the text
+            if check_for_claim(text):
+                clicks += 1
+                os.system("adb shell input tap 757 1950")
+                print(f"Tapped 'Claim': {clicks}")
+                if clicks > 25:
+                    return
 
-            # After tapping "Claim", check for skip or close button again
-            print("Claim tapped, checking for skip or close button again...")
-            while not handle_skip_or_close():
-                pass  # Keep checking until a skip or close button is found and handled
+                # After tapping "Claim", check for skip or close button again
+                print("Claim tapped, checking for skip or close button again...")
+                while not handle_skip_or_close():
+                    pass  # Keep checking until a skip or close button is found and handled
 
-            continue
+                continue
 
-        # Step 6: Process question and options
-        if len(numbers) >= 4:
-            question = "".join(numbers[:-4])
-            options = numbers[-4:]
-            coordinates = {0: "257 1630", 1: "757 1630", 2: "257 1888", 3: "757 1888"}
+            # Step 6: Process question and options
+            if len(numbers) >= 4 and len(numbers)<=5:
+                question = "".join(numbers[:-4])
+                options = numbers[-4:]
+                coordinates = {0: "257 1630", 1: "757 1630", 2: "257 1888", 3: "757 1888"}
 
-            for i, option in enumerate(options):
-                if question in option or sum(1 for digit in question if digit in option) >= 3:
-                    adb_command = f"adb shell input tap {coordinates[i]}"
-                    os.system(adb_command)
-                    print(f"Question: {question}, Options: {options}, Tapped: {adb_command}")
-                    break
+                for i, option in enumerate(options):
+                    if question in option or sum(1 for digit in question if digit in option) >= 3:
+                        adb_command = f"adb shell input tap {coordinates[i]}"
+                        os.system(adb_command)
+                        print(f"Question: {question}, Options: {options}, Tapped: {adb_command}")
+                        break
+            else:
+                print("Not enough numbers to process question and options.")
+                print("Claim tapped, checking for skip or close button again...")
+                while not handle_skip_or_close():
+                    pass  # Keep checking until a skip or close button is found and handled
         else:
             print("Not enough numbers to process question and options.")
             print("Claim tapped, checking for skip or close button again...")
             while not handle_skip_or_close():
                 pass  # Keep checking until a skip or close button is found and handled
-
-            os.system("adb shell input keyevent 4")  # Press back button
-            continue
 
 if __name__ == "__main__":
     main()

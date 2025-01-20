@@ -68,7 +68,7 @@ def wait_for_buttons_and_tap(possible_texts, max_wait=300, check_interval=5):
         if find_and_tap_button_with_texts(possible_texts):
             print(f"Button found and tapped.")
             return True
-        pause(check_interval)
+        time.sleep(check_interval)
         waited += check_interval
     print(f"Buttons '{possible_texts}' not found within {max_wait} seconds.")
     return False
@@ -104,7 +104,7 @@ def find_and_tap_button_by_description(description):
                 # Tap on the calculated coordinates
                 subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
                 print(f"Tapped on the button with content-desc: '{description}' at coordinates: ({x}, {y})")
-                pause(30)
+                time.sleep(30)
                 return True
             
 def tap_on_center():
@@ -125,7 +125,7 @@ def wait_for_app_to_load(max_wait=10):
     Waits for the app to load, up to a maximum number of seconds.
     """
     print(f"Waiting for the app to load (up to {max_wait} seconds)...")
-    pause(max_wait)
+    time.sleep(max_wait)
 def find_and_tap_button_with_texts2(texts, description=""):
     """
     Finds and taps a button with any of the specified texts.
@@ -162,17 +162,17 @@ def appopen():
         # Tap "Earn Now" at the top center of the screen
         print("Tapping on center of the screen...")
         tap_on_center()
-        pause(1)
+        time.sleep(1)
 
         # Tap "Claim Now!"
         print("Looking for 'Earn Now'...")
         find_and_tap_button_by_description("jackpot")
-        pause(1)
+        time.sleep(1)
 
         # Tap "Claim Now!"
         print("Looking for 'Claim Now!'...")
         find_and_tap_button_with_texts(["Claim Now!"], "Claim Now!")
-        pause(1)
+        time.sleep(1)
 
         print("Looking for Watch Ad...")
         find_and_tap_button_by_description(["Watch Ad"],"Watch Ad")
@@ -185,32 +185,30 @@ def appopen():
         # Wait for "Continue" or "Retry" to appear
         print("Waiting for 'Continue' or 'Retry' to appear...")
         while not find_and_tap_button_with_texts2(["Continue", "Retry"], "Continue or Retry"):
-            pause(1)
+            time.sleep(1)
             print("Looking for 'Tickets'...")
             find_and_tap_button_by_description("Tickets")
-            pause(1)
+            time.sleep(1)
             find_and_tap_button_by_description("Play a game")
         print("Tapped 'Continue' or 'Retry'.")
 
-def pause(seconds):
-    pause(seconds)
 
 def main_loop():
     while True:
         find_and_tap_button_with_texts(["Complete"])
-        pause(1)
+        time.sleep(1)
         find_and_tap_button_with_texts(["Claim"])
-        pause(1)
+        time.sleep(1)
         find_and_tap_button_with_texts(["Claim Now!"])
-        pause(1)
+        time.sleep(1)
         find_and_tap_button_with_texts(["Watch Ad"])
         while not find_and_tap_button_with_texts2(["Continue", "Retry"], "Continue or Retry"):
-            pause(1)
+            time.sleep(1)
             print("Looking for 'Tickets'...")
             find_and_tap_button_by_description("Tickets")
-            pause(1)
+            time.sleep(1)
             if find_and_tap_button_with_texts(["Watch Ad"]) == True:
-                pause(5)
+                time.sleep(5)
             find_and_tap_button_by_description("Play a game")
         find_and_tap_button_with_texts(["Verify"])
         tap_on_center()
@@ -221,7 +219,7 @@ def main_loop():
         if wait_for_buttons_and_tap(["Open", "Play"]):
             # Wait for 2.5 minutes after tapping "Open" or "Play"
             print("Waiting for 2.5 minutes before relaunching the app...")
-            pause(150)
+            time.sleep(150)
             
             # Relaunch the app
             print("Launching the app: com.rayolesoftware.cash.daddy")
